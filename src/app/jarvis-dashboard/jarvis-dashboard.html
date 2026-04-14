@@ -1,22 +1,75 @@
 <div class="main">
-  <div class="image-container">
-    <div class="image">
-      <img src="https://iili.io/FapFCu9.gif" alt="JARVIS Assistant" />
+  <div class="content-area" [class.chat-open]="isChatPanelOpen">
+    <div class="lyra-section">
+      <div class="image-container">
+        <div class="image">
+          <img src="https://iili.io/FapFCu9.gif" alt="JARVIS Assistant" />
+        </div>
+        <h1 class="mt-2">L Y R A</h1>
+        <p>Hello Dhanush! I'm LYRA. How can I assist you today?</p>
+      </div>
     </div>
-    <h1 class="mt-2">L Y R A</h1>
-    <p>Hello Dhanush! I'm LYRA. How can I assist you today?</p>
+
+    <div class="chat-panel" [class.open]="isChatPanelOpen">
+      <div class="chat-header">
+        <h3>Conversation</h3>
+        <button class="close-chat" (click)="toggleChatPanel()">×</button>
+      </div>
+      <div class="chat-messages" #chatMessages>
+        <div
+          *ngFor="let msg of messages"
+          class="message"
+          [class.user-message]="msg.isUser"
+          [class.ai-message]="!msg.isUser"
+        >
+          <div class="message-bubble">
+            <span class="message-text">{{ msg.text }}</span>
+            <span class="message-time">{{ msg.timestamp | date: 'shortTime' }}</span>
+          </div>
+        </div>
+        <div *ngIf="messages.length === 0" class="empty-chat">
+          <p>No messages yet. Start a conversation!</p>
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <input
+          [(ngModel)]="currentInput"
+          (keyup.enter)="sendMessage()"
+          placeholder="Type your command..."
+          class="chat-input"
+        />
+        <button class="send-btn" (click)="sendMessage()" [disabled]="!currentInput.trim()">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+    </div>
   </div>
- <input
-        [(ngModel)]="currentInput"
-        (keyup.enter)="sendMessage()"
-        placeholder="Type your command or click the mic..."
-        rows="3"
-      />
 
   <div class="dd">
-    <div class="input">
-      <button class="talk" [class.listening]="isListening" (click)="startVoiceRecognition()">
-        <mat-icon fontIcon="home"></mat-icon>
+    <div class="action-buttons">
+      <button
+        class="action-btn chat-btn"
+        [class.active]="isChatPanelOpen"
+        (click)="toggleChatPanel()"
+      >
+        <mat-icon>chat</mat-icon>
+      </button>
+      <button
+        class="action-btn mic-btn"
+        [class.listening]="isListening"
+        (click)="toggleMicrophone()"
+      >
+        <mat-icon>mic</mat-icon>
       </button>
     </div>
   </div>
