@@ -1,17 +1,17 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { Chat } from './chat';
+import { JarvisDashboard } from './jarvis-dashboard';
 
-describe('Chat', () => {
-  let component: Chat;
-  let fixture: ComponentFixture<Chat>;
+describe('JarvisDashboard', () => {
+  let component: JarvisDashboard;
+  let fixture: ComponentFixture<JarvisDashboard>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [Chat],
+      imports: [JarvisDashboard],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(Chat);
+    fixture = TestBed.createComponent(JarvisDashboard);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });

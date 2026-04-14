@@ -1,0 +1,23 @@
+<div class="main">
+  <div class="image-container">
+    <div class="image">
+      <img src="https://iili.io/FapFCu9.gif" alt="JARVIS Assistant" />
+    </div>
+    <h1 class="mt-2">L Y R A</h1>
+    <p>Hello Dhanush! I'm LYRA. How can I assist you today?</p>
+  </div>
+ <input
+        [(ngModel)]="currentInput"
+        (keyup.enter)="sendMessage()"
+        placeholder="Type your command or click the mic..."
+        rows="3"
+      />
+
+  <div class="dd">
+    <div class="input">
+      <button class="talk" [class.listening]="isListening" (click)="startVoiceRecognition()">
+        <mat-icon fontIcon="home"></mat-icon>
+      </button>
+    </div>
+  </div>
+</div>
