@@ -1,64 +1,19 @@
-<div class="jarvis-container">
-  <div class="header">
-    <div class="header-content">
-      <h1>🤖 JARVIS AI Assistant</h1>
-      <div class="status">
-        <span class="status-dot" [class.speaking]="isSpeaking"></span>
-        <span>{{ isSpeaking ? 'Speaking...' : 'Active' }}</span>
-      </div>
-    </div>
-    <div class="controls">
-      <button
-        class="btn-stop-speech"
-        (click)="stopSpeaking()"
-        *ngIf="isSpeaking"
-        title="Stop speaking"
-      >
-        🔇 Stop
-      </button>
-    </div>
-  </div>
+<app-jarvis-dashboard></app-jarvis-dashboard>
 
-  <div class="chat-messages" #scrollMe>
-    <div
-      *ngFor="let message of messages"
-      [class]="message.isUser ? 'user-message' : 'jarvis-message'"
-    >
-      <div class="message-bubble">
-        <div class="message-header">
-          <strong>{{ message.isUser ? 'You' : 'JARVIS' }}</strong>
-          <span class="message-time">{{ message.timestamp | date: 'shortTime' }}</span>
-        </div>
-        <p>{{ message.text }}</p>
-        <div class="message-footer" *ngIf="!message.isUser">
-          <span *ngIf="message.action" class="action-badge"> ⚡ {{ message.action }} </span>
-          <button class="btn-speak" (click)="speakText(message.text)" title="Repeat">🔊</button>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <div class="input-area">
-    <div class="input-container">
-      <input
-        [(ngModel)]="currentInput"
-        (keyup.enter)="sendMessage()"
-        placeholder="Type your command or click the mic..."
-        rows="3"
-      />
-
-      <div class="button-group">
-        <button (click)="sendMessage()" class="btn-send" [disabled]="isSpeaking">Send 📤</button>
-        <button
-          (click)="startVoiceRecognition()"
-          [class.active]="isListening"
-          class="btn-mic"
-          [disabled]="isSpeaking"
-        >
-          🎤 {{ isListening ? 'Listening...' : 'Voice' }}
-        </button>
-        <button (click)="stopSpeaking()" class="btn-stop" *ngIf="isSpeaking">⏹️ Stop</button>
-      </div>
+<!-- app.component.html -->
+<!-- <section class="main">
+  <div class="image-container">
+    <div class="image">
+      <img src="https://iili.io/FapFCu9.gif" alt="JARVIS Assistant">
     </div>
+    <h1>J A R V I S</h1>
+    <p>I'm a Virtual Assistant JARVIS, How may I help you?</p>
   </div>
-</div>
+  <div class="input">
+    <button class="talk"  [class.listening]="isListening">
+      <i class="fas fa-microphone-alt"></i>
+    </button>
+    <h1 class="content">{{ contentText }}</h1>
+  </div>
+</section> -->
