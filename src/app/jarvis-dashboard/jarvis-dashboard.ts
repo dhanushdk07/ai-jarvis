@@ -1,4 +1,11 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  ElementRef,
+  ViewChild,
+  AfterViewChecked,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
@@ -20,16 +27,21 @@ interface Message {
   templateUrl: './jarvis-dashboard.html',
   styleUrl: './jarvis-dashboard.scss',
 })
-export class JarvisDashboard implements OnInit, OnDestroy {
+export class JarvisDashboard implements OnInit, OnDestroy, AfterViewChecked {
+  @ViewChild('chatMessages') private chatMessagesContainer!: ElementRef;
+
   messages: Message[] = [];
   currentInput: string = '';
   isListening: boolean = false;
   isSpeaking: boolean = false;
+  isChatPanelOpen: boolean = false;
   private subscription?: Subscription;
   private speechSynthesis: SpeechSynthesis | null = null;
   private currentUtterance: SpeechSynthesisUtterance | null = null;
-  private autoMicEnabled: boolean = true; // Flag to control auto mic
-  private recognition: any = null; // Store recognition instance
+  private autoMicEnabled: boolean = true;
+  private recognition: any = null;
+  private hasShownWelcome: boolean = false;
+  private scrollTimeout: any = null;
 
   constructor(
     private jarvisService: JarvisService,
@@ -37,21 +49,27 @@ export class JarvisDashboard implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
+    this.loadMessagesFromStorage();
+
     if (isPlatformBrowser(this.platformId)) {
       this.speechSynthesis = window.speechSynthesis;
-    }
+      this.cancelAnyOngoingSpeech();
 
-    const welcomeText = "Hello Dhanush! I'm LYRA. How can I assist you today?";
-
-    this.messages.push({
-      text: welcomeText,
-      isUser: false,
-      timestamp: new Date(),
-    });
-
-    // ✅ Only speak in browser
-    if (isPlatformBrowser(this.platformId)) {
-      this.speakText(welcomeText);
+      if (this.messages.length === 0) {
+        this.loadVoicesAndSpeak();
+      } else {
+        this.setupVoiceWithoutSpeaking();
+      }
+    } else {
+      if (this.messages.length === 0) {
+        const welcomeText = "Hello Dhanush! I'm LYRA. How can I assist you today?";
+        this.messages.push({
+          text: welcomeText,
+          isUser: false,
+          timestamp: new Date(),
+        });
+        this.saveMessagesToStorage();
+      }
     }
 
     this.subscription = this.jarvisService
@@ -66,10 +84,106 @@ export class JarvisDashboard implements OnInit, OnDestroy {
           action: response.action_taken,
         });
 
+        this.saveMessagesToStorage();
+        this.scrollToBottom();
+
         if (isPlatformBrowser(this.platformId)) {
           this.speakText(replyText);
         }
       });
+  }
+
+  ngAfterViewChecked() {
+    this.scrollToBottom();
+  }
+
+  private scrollToBottom(): void {
+    if (this.chatMessagesContainer && this.isChatPanelOpen) {
+      if (this.scrollTimeout) {
+        clearTimeout(this.scrollTimeout);
+      }
+      this.scrollTimeout = setTimeout(() => {
+        const element = this.chatMessagesContainer.nativeElement;
+        element.scrollTop = element.scrollHeight;
+      }, 100);
+    }
+  }
+
+  toggleChatPanel(): void {
+    this.isChatPanelOpen = !this.isChatPanelOpen;
+    if (this.isChatPanelOpen) {
+      setTimeout(() => {
+        this.scrollToBottom();
+      }, 300);
+    }
+  }
+
+  private cancelAnyOngoingSpeech() {
+    if (this.speechSynthesis) {
+      this.speechSynthesis.cancel();
+    }
+  }
+
+  private setupVoiceWithoutSpeaking() {
+    if (this.speechSynthesis) {
+      let voices = this.speechSynthesis.getVoices();
+      if (voices.length === 0) {
+        this.speechSynthesis.addEventListener('voiceschanged', () => {});
+      }
+    }
+  }
+
+  private loadMessagesFromStorage() {
+    if (isPlatformBrowser(this.platformId)) {
+      const savedMessages = localStorage.getItem('lyra_messages');
+      if (savedMessages) {
+        try {
+          const parsedMessages = JSON.parse(savedMessages);
+          this.messages = parsedMessages.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp),
+          }));
+          this.hasShownWelcome = true;
+        } catch (e) {
+          console.error('Error loading messages:', e);
+        }
+      }
+    }
+  }
+
+  private saveMessagesToStorage() {
+    if (isPlatformBrowser(this.platformId)) {
+      const messagesToStore = this.messages.slice(-100);
+      localStorage.setItem('lyra_messages', JSON.stringify(messagesToStore));
+    }
+  }
+
+  private loadVoicesAndSpeak() {
+    const welcomeText = "Hello Dhanush! I'm LYRA. How can I assist you today?";
+
+    if (!this.hasShownWelcome) {
+      this.messages.push({
+        text: welcomeText,
+        isUser: false,
+        timestamp: new Date(),
+      });
+      this.saveMessagesToStorage();
+      this.hasShownWelcome = true;
+    }
+
+    let voices = this.speechSynthesis?.getVoices() || [];
+
+    if (voices.length > 0) {
+      if (this.messages.length === 1 && this.messages[0].text === welcomeText) {
+        this.speakText(welcomeText);
+      }
+    } else {
+      this.speechSynthesis?.addEventListener('voiceschanged', () => {
+        if (this.messages.length === 1 && this.messages[0].text === welcomeText) {
+          this.speakText(welcomeText);
+        }
+      });
+    }
   }
 
   speakText(text: string) {
@@ -77,90 +191,129 @@ export class JarvisDashboard implements OnInit, OnDestroy {
 
     if (this.currentUtterance) {
       this.speechSynthesis.cancel();
+      this.currentUtterance = null;
     }
 
-    this.currentUtterance = new SpeechSynthesisUtterance(text);
+    setTimeout(() => {
+      if (!this.speechSynthesis) return;
 
-    this.currentUtterance.rate = 1.0;
-    this.currentUtterance.pitch = 1.0;
-    this.currentUtterance.volume = 1.0;
+      this.currentUtterance = new SpeechSynthesisUtterance(text);
 
-    this.setJarvisVoice();
+      this.currentUtterance.rate = 1.0;
+      this.currentUtterance.pitch = 1.0;
+      this.currentUtterance.volume = 1.0;
 
-    this.currentUtterance.onstart = () => {
-      this.isSpeaking = true;
-    };
+      this.setJarvisVoice();
 
-    this.currentUtterance.onend = () => {
-      this.isSpeaking = false;
+      this.currentUtterance.onstart = () => {
+        this.isSpeaking = true;
+      };
 
-      // ✅ Auto start mic after AI finishes speaking
-      if (this.autoMicEnabled) {
-        this.startVoiceRecognition();
-      }
-    };
+      this.currentUtterance.onend = () => {
+        this.isSpeaking = false;
+        this.currentUtterance = null;
 
-    this.currentUtterance.onerror = () => {
-      this.isSpeaking = false;
+        if (this.autoMicEnabled && !this.isSpeaking) {
+          setTimeout(() => {
+            if (this.autoMicEnabled && !this.isSpeaking && !this.isListening) {
+              this.startVoiceRecognition();
+            }
+          }, 500);
+        }
+      };
 
-      // ✅ Auto start mic even on error
-      if (this.autoMicEnabled) {
-        this.startVoiceRecognition();
-      }
-    };
+      this.currentUtterance.onerror = (event) => {
+        console.error('Speech error:', event);
+        this.isSpeaking = false;
+        this.currentUtterance = null;
 
-    this.speechSynthesis.speak(this.currentUtterance);
+        if (this.autoMicEnabled && !this.isSpeaking) {
+          setTimeout(() => {
+            if (this.autoMicEnabled && !this.isSpeaking && !this.isListening) {
+              this.startVoiceRecognition();
+            }
+          }, 500);
+        }
+      };
+
+      this.speechSynthesis?.speak(this.currentUtterance);
+    }, 100);
   }
 
-  // Set a natural voice (prefers male/English voices)
   private setJarvisVoice() {
-    if (!this.speechSynthesis) return;
+    if (!this.speechSynthesis || !this.currentUtterance) return;
 
-    // Get all available voices
-    const voices = this.speechSynthesis.getVoices();
+    let voices = this.speechSynthesis.getVoices();
 
-    // Try to find a good JARVIS-like voice
-    const preferredVoices = [
-      'Google UK English Male',
-      'Microsoft David Desktop',
-      'Google US English',
-      'Samantha', // Female but clear
-      'Alex', // Male US
+    if (voices.length === 0) {
+      this.speechSynthesis.addEventListener('voiceschanged', () => {
+        this.setJarvisVoice();
+      });
+      return;
+    }
+
+    const preferredFemaleVoices = [
+      'Google UK English Female',
+      'Microsoft Zira Desktop',
+      'Google US English Female',
+      'Samantha',
+      'Google français',
+      'Mojave',
+      'Victoria',
+      'Allison',
     ];
 
-    for (const preferred of preferredVoices) {
-      const voice = voices.find((v) => v.name.includes(preferred));
-      if (voice && this.currentUtterance) {
-        this.currentUtterance.voice = voice;
+    let selectedVoice = null;
+    for (const preferred of preferredFemaleVoices) {
+      selectedVoice = voices.find((v) => v.name.includes(preferred));
+      if (selectedVoice) {
+        this.currentUtterance.voice = selectedVoice;
+        console.log('Selected female voice:', selectedVoice.name);
         break;
       }
     }
 
-    // Fallback: Use first English voice
-    if (this.currentUtterance && !this.currentUtterance.voice) {
-      const englishVoice = voices.find((v) => v.lang.startsWith('en'));
-      if (englishVoice) {
-        this.currentUtterance.voice = englishVoice;
+    if (!selectedVoice) {
+      const femaleIndicators = [
+        'female',
+        'girl',
+        'woman',
+        'samantha',
+        'zira',
+        'allison',
+        'victoria',
+        'mojave',
+      ];
+      const femaleVoice = voices.find((v) =>
+        femaleIndicators.some((indicator) => v.name.toLowerCase().includes(indicator)),
+      );
+
+      if (femaleVoice) {
+        this.currentUtterance.voice = femaleVoice;
+        console.log('Found female voice:', femaleVoice.name);
+      } else {
+        const englishVoice = voices.find((v) => v.lang.startsWith('en'));
+        if (englishVoice) {
+          this.currentUtterance.voice = englishVoice;
+          console.warn('No female voice found, using default:', englishVoice.name);
+        }
       }
     }
   }
 
-  // Stop current speech
   stopSpeaking() {
     if (this.speechSynthesis) {
       this.speechSynthesis.cancel();
       this.isSpeaking = false;
+      this.currentUtterance = null;
     }
   }
 
-  // Stop voice recognition
   stopVoiceRecognition() {
     if (this.recognition) {
       try {
         this.recognition.stop();
-      } catch (e) {
-        // Ignore errors if already stopped
-      }
+      } catch (e) {}
       this.recognition = null;
     }
     this.isListening = false;
@@ -169,22 +322,25 @@ export class JarvisDashboard implements OnInit, OnDestroy {
   sendMessage() {
     if (!this.currentInput.trim()) return;
 
-    // ✅ Stop listening while processing command
+    if (!this.isChatPanelOpen) {
+      this.isChatPanelOpen = true;
+    }
+
     this.stopVoiceRecognition();
-
-    // Disable auto mic temporarily while processing
     this.autoMicEnabled = false;
+    this.stopSpeaking();
 
-    // Add user message
     this.messages.push({
       text: this.currentInput,
       isUser: true,
       timestamp: new Date(),
     });
 
+    this.saveMessagesToStorage();
+    this.scrollToBottom();
+
     console.log('User command:', this.currentInput);
 
-    // Send to backend
     this.jarvisService.sendCommand(this.currentInput).subscribe({
       next: (response: any) => {
         const replyText = response.reply;
@@ -195,11 +351,13 @@ export class JarvisDashboard implements OnInit, OnDestroy {
           action: response.action_taken,
         });
 
-        // Automatically speak the response
+        this.saveMessagesToStorage();
+        this.scrollToBottom();
         this.speakText(replyText);
 
-        // Re-enable auto mic after response is processed
-        this.autoMicEnabled = true;
+        setTimeout(() => {
+          this.autoMicEnabled = true;
+        }, 1000);
       },
       error: (error: any) => {
         console.error('Error:', error);
@@ -209,10 +367,14 @@ export class JarvisDashboard implements OnInit, OnDestroy {
           isUser: false,
           timestamp: new Date(),
         });
+
+        this.saveMessagesToStorage();
+        this.scrollToBottom();
         this.speakText(errorText);
 
-        // Re-enable auto mic after error
-        this.autoMicEnabled = true;
+        setTimeout(() => {
+          this.autoMicEnabled = true;
+        }, 1000);
       },
     });
 
@@ -220,16 +382,14 @@ export class JarvisDashboard implements OnInit, OnDestroy {
   }
 
   startVoiceRecognition() {
-    // Don't start if already listening or speaking or auto mic disabled
     if (!isPlatformBrowser(this.platformId)) return;
     if (this.isListening || this.isSpeaking || !this.autoMicEnabled) return;
 
     if (!('webkitSpeechRecognition' in window)) {
-      alert('Voice recognition not supported in this browser');
+      console.warn('Voice recognition not supported');
       return;
     }
 
-    // Stop any existing recognition
     this.stopVoiceRecognition();
 
     this.recognition = new (window as any).webkitSpeechRecognition();
@@ -242,15 +402,15 @@ export class JarvisDashboard implements OnInit, OnDestroy {
     this.recognition.onresult = (event: any) => {
       const command = event.results[0][0].transcript;
       this.currentInput = command;
-      this.sendMessage(); // This will stop listening automatically
+      this.sendMessage();
     };
 
-    this.recognition.onerror = () => {
+    this.recognition.onerror = (event: any) => {
+      console.error('Recognition error:', event.error);
       this.isListening = false;
       this.recognition = null;
 
-      // Restart mic after error with delay
-      if (this.autoMicEnabled && !this.isSpeaking) {
+      if (this.autoMicEnabled && !this.isSpeaking && event.error !== 'no-speech') {
         setTimeout(() => {
           if (this.autoMicEnabled && !this.isSpeaking && !this.isListening) {
             this.startVoiceRecognition();
@@ -263,7 +423,6 @@ export class JarvisDashboard implements OnInit, OnDestroy {
       this.isListening = false;
       this.recognition = null;
 
-      // Auto restart if not speaking and auto mic enabled
       if (this.autoMicEnabled && !this.isSpeaking) {
         setTimeout(() => {
           if (this.autoMicEnabled && !this.isSpeaking && !this.isListening) {
@@ -276,7 +435,6 @@ export class JarvisDashboard implements OnInit, OnDestroy {
     this.recognition.start();
   }
 
-  // Manual toggle for microphone
   toggleMicrophone() {
     if (this.isListening) {
       this.stopVoiceRecognition();
@@ -287,11 +445,35 @@ export class JarvisDashboard implements OnInit, OnDestroy {
     }
   }
 
+  clearChatHistory() {
+    if (confirm('Are you sure you want to clear chat history?')) {
+      this.messages = [];
+      this.hasShownWelcome = false;
+      localStorage.removeItem('lyra_messages');
+      this.stopSpeaking();
+      this.stopVoiceRecognition();
+
+      if (isPlatformBrowser(this.platformId)) {
+        this.loadVoicesAndSpeak();
+      } else {
+        const welcomeText = "Hello Dhanush! I'm LYRA. How can I assist you today?";
+        this.messages.push({
+          text: welcomeText,
+          isUser: false,
+          timestamp: new Date(),
+        });
+      }
+    }
+  }
+
   ngOnDestroy() {
     this.subscription?.unsubscribe();
-    // Clean up speech synthesis
+    this.saveMessagesToStorage();
     this.stopSpeaking();
-    // Clean up voice recognition
     this.stopVoiceRecognition();
+
+    if (this.scrollTimeout) {
+      clearTimeout(this.scrollTimeout);
+    }
   }
 }
