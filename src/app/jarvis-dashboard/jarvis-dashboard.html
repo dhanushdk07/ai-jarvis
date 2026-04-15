@@ -7,11 +7,6 @@
             src="https://i.pinimg.com/originals/e7/87/4d/e7874ddd8233271f6189f108616baabe.gif"
             alt="JARVIS Assistant"
           />
-          <!-- <img
-            src="https://i.pinimg.com/originals/d1/e5/94/d1e5948463f89de6ebc6f1dcb09de35f.gif"
-            alt="JARVIS Assistant"
-          /> -->
-          <!-- <img src="https://iili.io/FapFCu9.gif" alt="JARVIS Assistant" /> -->
         </div>
         <h1 class="mt-2">L Y R A</h1>
         <p>Hello Dhanush! I'm LYRA. How can I assist you today?</p>
@@ -30,10 +25,22 @@
           [class.user-message]="msg.isUser"
           [class.ai-message]="!msg.isUser"
         >
+          <!-- Avatar for AI message -->
+          <div class="avatar" *ngIf="!msg.isUser">
+            <!-- <mat-icon>smart_toy</mat-icon> -->
+            <!-- Or use an image -->
+            <img src="../../assets/lyra3.png" alt="AI Avatar" />
+          </div>
+          <div class="avatar user-avatar" *ngIf="msg.isUser">
+            <!-- Or use an image -->
+            <img src="../../assets/DK.png" alt="User Avatar" />
+          </div>
           <div class="message-bubble">
             <span class="message-text">{{ msg.text }}</span>
             <span class="message-time">{{ msg.timestamp | date: 'shortTime' }}</span>
           </div>
+
+          <!-- Avatar for User message -->
         </div>
         <div *ngIf="messages.length === 0" class="empty-chat">
           <p>No messages yet. Start a conversation!</p>
